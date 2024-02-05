@@ -6,15 +6,30 @@
 
 import dotenv from 'dotenv'
 import connectDB from "./db/index.js";
+import { app } from './app.js';
 
 dotenv.config({
     path: './.env' 
     // DOUBT: it should be like '../.env'
-
+    // ANS: below we can see that I am checking 
+    //      whether we are getting data in .env file
+    //      by using the console.log . From that 
+    //      I had seen that I am getting the result 
+    //      in both the situations that is in ../.env
+    //      and ./.env
 })
-
+// console.log(process.env.PORT);
 
 connectDB()
+.then(()=>{
+    app.listen(process.env.PORT || 8000, () => {
+        console.log(`Server is running at port : 
+        ${process.env.PORT}`);
+    })
+})
+.catch((err) =>{
+    console.log("MongoDB connection failed !!!", err);
+})
 
 
 
