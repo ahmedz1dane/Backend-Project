@@ -11,6 +11,9 @@ const app = express()
 // DOUBT 2: WHAT IS MEANT BY MIDDLEWARE
 // ANS: middleware are used to process the request
 //      from the client ,response to the client etc.
+// so in general we can say that , middlewares are
+// the functions  that are present in the middle
+// and do some specific functions
 
 app.use(cors({
     origin:process.env.CORS_ORIGIN,
@@ -31,6 +34,8 @@ limit:"16kb"
 //          done here
 
 app.use(express.static("public"))
+// here , public is a folder which contains data like
+// images I guess
 
 app.use(cookieParser())
 // Working: when a client makes a request , it can 
@@ -38,5 +43,14 @@ app.use(cookieParser())
 //          this middleware will parese that and give 
 //          a object that contain key-value pair of
 //          parsed cookies
+
+
+
+// Routes import
+
+// they are usually kept in app.js but not in index.js
+// cause index.js are usually kept more clean
+
+import userRouter from './routes/user.routes.js'
 
 export { app }

@@ -100,11 +100,23 @@ userSchema.methods.isPasswordCorrect = async function
     return await bcrypt.compare(password, this.password)
 }
 
+// WORKING OF THE BELOW 2 (ACCESS TOKENS & REFRESH TOKENS):
+
+// When a user logins he will be getting access token
+// which usually will be having small life span as
+// specified in the .env file. This tokens can be used
+// by the user to access resources or othere things in
+//  the server without logging in each time
+// Whereas refresh tokens are used to give the access
+// tokens when they get expired, without the need of 
+// logging in again 
 
 userSchema.methods.generateAccessToken = function(){
     return jwt.sign(
         {
             _id: this._id,
+            // We doesnt need to generate this, cause 
+            // it will be there in the mongoDB automatically
             email: this.email,
             usename: this.usename,
             fullName: this.fullName
