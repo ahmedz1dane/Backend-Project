@@ -1,6 +1,6 @@
 const asyncHandler = (requestHandler) => {
-    (req, res, next) => {
-        Promise.resolve(requestHandler(req, res, next))
+    return (req, res, next) => {//here we have to return the function , otherwise the error will occur
+         Promise.resolve(requestHandler(req, res, next))
         // DOUBT: why promise.resolve is used ?
         // ANS: to bring consistency in the code
         //      cause some funcrions may return a
