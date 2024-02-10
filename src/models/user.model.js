@@ -76,7 +76,14 @@ userSchema.pre("save", async function (next) {
     //      keyword below
 
     if(!this.isModified("password")) return next();
-        this.password = bcrypt.hash(this.password, 10)
+    // DOUBT: What is the purpose of the above line ?
+    // ANS: cause we need to hash and store the 
+    //      password in the database only when 
+    //      it is changed . So we are checking here
+    //      whether the password is changed or not
+    //      if password is not changed the retrn next()
+    //      gets executed
+        this.password = await bcrypt.hash(this.password, 10)
         next()
 
         // DOUBT:WHy there is a need to use next() ?
@@ -105,7 +112,7 @@ userSchema.methods.isPasswordCorrect = async function
 // When a user logins he will be getting access token
 // which usually will be having small life span as
 // specified in the .env file. This tokens can be used
-// by the user to access resources or othere things in
+// by the user to access resources or other things in
 //  the server without logging in each time
 // Whereas refresh tokens are used to give the access
 // tokens when they get expired, without the need of 

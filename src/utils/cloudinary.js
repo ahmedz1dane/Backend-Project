@@ -1,7 +1,7 @@
 import {v2 as cloudinary} from 'cloudinary'
 import fs from 'fs'
 // fs means file system. We doesnt need to import 
-// it explicitly, cause oit it will be already there 
+// it explicitly, cause it will be already there 
 // with node.js
 // this is mainly used to do operations on the files
 
@@ -22,7 +22,11 @@ const uploadOnCloudinary = async (localFilePath) => {
             resource_type:"auto"
         })
         // file has beeb uploaded successfully
-        console.log("File uploaded on cloudinary",response.url);
+        // console.log("File uploaded on cloudinary",response.url);
+        fs.unlinkSync(localFilePath)
+        // The above line means , after the image is 
+        // successfully uploaded to thecloudinary
+        // it will be removed from the local repository
         return response
     } catch (error) {
         
