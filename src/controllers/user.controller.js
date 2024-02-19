@@ -4,6 +4,74 @@ import {User} from '../models/user.model.js'
 import { uploadOnCloudinary } from '../utils/cloudinary.js'
 import { ApiResponse } from '../utils/ApiResposnse.js'
 
+
+
+// WHAT IS THE PURPOSE OF ACCESSTOKENS:
+// SUPOSE WE ARE GONNA ACCESS SOME IMPORT DATA
+// FROM THE SERVER. IN SUCH CASE INSTEAD OF 
+// INCLUDING THE USERNAME AND PASSWORD EACH TIME
+// IT IS CONVINIENT TO USE THESE TOKENS, FOR BETTER
+// SECURITY BECAUSE THESE TOKENS WILL BE REFRESHED.
+
+// HOW THIS ACCESTOKEN IS USED BY CLIENT FOR THE 
+// ABOVE MENTIONED PURPOSE ?
+
+// WE CAN SEE IN THE END OF THE LOGIN FUNCTION WE 
+// ARE CREATING A COOKIE WHICH WE WILL SEND TO THE 
+// CLIENT AS RESPONSE. THIS COOKIE WILL BE STORED IN
+// THE BROWSER OF THE CLIENT. AND WHENEVER A REQUEST 
+// IS MADE FROM THE CLIENT , THE BROWSER AUTOMATICALLY
+// ADDS THESE ACCESSTOKEN AS HEADER
+
+
+
+
+
+
+// we are using accessToken and Refresh token frequently
+// so we are gonna use a function for it as below:
+
+const generateAccessAndRefreshTokens = async(userId) => {
+    // DOUBT: from where we got UserId:
+    // ANS: by going below we can see that we had 
+    //      retrieved the particular document from 
+    //      from the mongoDB by using findOne
+    //      from that we will be able to retrieve 
+    //      the userId very easily 
+    try {
+         const user = await User.findById(userId)
+
+         const accessToken = user.generateAccessToken()
+         const refreshToken = user.generateRefreshToken()
+
+         user.refreshToken = refreshToken
+        // DOUBT: why saved is used ?
+        // ANS:
+
+        // it is used for the purpose of updating the 
+        // data in the database
+         await user.save({validateBeforeSave: false})
+        // when we are updating the data in the databese
+        // it automatically validate the document that 
+        // we have updated with the schema of that particular
+        // document
+        // validateBeforeSave is set to false because
+        // we doesnt want to perform that
+        
+        // DOUBT: why this paricular condition is used here ?
+        // CHECK THIS!!!!
+        
+
+        return {accessToken, refreshToken}
+    } catch (error) {
+        throw new ApiError(500,"Something went wrong while generating refresh and access token")
+
+    }
+}
+
+
+
+
 const registerUser = asyncHandler( async (req, res) => {
     // ALGORITHM:
     
@@ -31,7 +99,7 @@ const registerUser = asyncHandler( async (req, res) => {
     if(
         [fullName, email, username, password]
         .some((field) => 
-            // DOUBT: Why some is used 
+            // DOUBT: Why some is used in the above?
             // ANS: some is used to check , wheter
             //      any of the elements in the list 
             //      satisfies the condition
@@ -174,8 +242,139 @@ const registerUser = asyncHandler( async (req, res) => {
     )
     // DOUBT 1 : why 2 status code is used in the 
     //           above case ?
+    // ANS: When you are using the postman , you can understand 
+    //      this, cause in this 2 status code , one will be shown 
+    //      in the title bar and the other will be shown in the
+    //      json body
+})
+
+const loginUser = asyncHandler( async (req, res) => {
+    // data <- req body
+    // username or email
+    // find the user
+    // password check
+    // access and refresh token
+    // send cookies
+
+
+    const {email , username, password} = req.body
+
+    if(!username && !email){
+        throw new ApiError(400,"Username or password is required")
+        // DOUBT: Why new is used ?
+        // ANS: Cause we are creating
+        //      the object of ApiError
+    }
+
+
+    const user = await User.findOne({
+        $or:[{username} , {email}]
+    }) 
+    // DOUBT: see what user is 
+
+    if(!user){
+        throw new ApiError(404, "User does not exist")
+    }
+
+    // DOUBT:Why user instead of User ?
+    // ANS:
+
+    // in the below we can see a situation  , we are 
+    // using (u)ser instead of (U)ser because User 
+    // is an instance of mongoose , whereas user 
+    // is ours , that we have retrieved from the mongoDB
+    // findOne etc are the methods of mongoose , so
+    // we will be using User with it (cause its the 
+    // instance of mongoose itself). Whereas 
+    // isPasswordCreate is method that we had created
+    // so we has to use the user that is ours instedof
+    // that of mongoose (User)
+    const isPasswordValid = await user.isPasswordCorrect(password)
+
+
+    if(!isPasswordValid){
+        throw new ApiError(401, "Invalid user credential")
+    }
+
+    const {accessToken, refreshToken} = await 
+    generateAccessAndRefreshTokens(user._id)
+
+    // Now we are gonna create cookies and sent it
+    // to user
+    // DOUBT: Why cant we use the user object jst above?
+    // ANS:
+
+    // Cause in jst above we can see that we are 
+    // updating our database with refreshToken
+    // but that is not available in the user Object
+    // cause we have created it before we are updating
+    // the database . Therefore it doesnt contains the 
+    // updated data. So that is  the reason behind we 
+    // are creating loggedInUser
+
+    const loggedInUser = await User.findById(user._id).
+    select("-password -refreshToken")
+
+    const options = {
+        httpOnly: true,
+        // means that , this particular cookie can 
+        // be accessed only by using http . Which 
+        // enhanses the security
+        secure:true
+    }
+
+    return res
+    .status(200)
+
+    .cookie("accessToken", accessToken, options)
+    // here the name of the cookie is accessToken
+    // then we pass the data and the options
+
+    .cookie("refreshToken", refreshToken, options)
+    .json(
+        new ApiResponse(
+            200,
+            {
+                user: loggedInUser, accessToken, 
+                refreshToken
+            },
+            "User logged in Successfully"
+        )
+    )
 })
 
 
+const logoutUser = asyncHandler( async (req , res) => {
+    await User.findByIdAndUpdate(
+        req.user._id,
+        {
+            $set:{
+                refreshToken: undefined
+            }
+        },
+        {
+            new: true
+            // specifies whether to return the original
+            // or the updated ducument. Here sice we 
+            // specifies true, the updated document is 
+            // returned
+        }
+    )
 
-export {registerUser} 
+    const options = {
+        httpOnly: true,
+        secure: true
+    }
+
+    return res
+    .status(200)
+    .clearCookie("accessToken", options)
+    .clearCookie("refreshToken", options)
+    .json(new ApiResponse(200, {}, "User logged out"))
+})
+
+export {
+    registerUser,
+    loginUser,
+    logoutUser
+} 

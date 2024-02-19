@@ -35,7 +35,7 @@ limit:"16kb"
 
 app.use(express.static("public"))
 // here , public is a folder which contains data like
-// images I guess
+// images
 
 app.use(cookieParser())
 // Working: when a client makes a request , it can 

@@ -76,6 +76,10 @@ userSchema.pre("save", async function (next) {
     //      keyword below
 
     if(!this.isModified("password")) return next();
+    // DOUBT: WHY THE NEXT IS USED?
+    
+
+
     // DOUBT: What is the purpose of the above line ?
     // ANS: cause we need to hash and store the 
     //      password in the database only when 

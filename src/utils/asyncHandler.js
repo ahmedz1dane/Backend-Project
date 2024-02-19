@@ -1,4 +1,14 @@
 const asyncHandler = (requestHandler) => {
+    // DOUBT: What is happening in the below line:
+    // ANS: asyncHadler is a higher order function
+    //      that means , it will be return another
+    //      function
+    //      we are taking req, res, next as the 
+    //      arguments for that function and we are 
+    //      passing these arguments to the function 
+    //      that we are wrapping inside it
+
+
     return (req, res, next) => {//here we have to return the function , otherwise the error will occur
          Promise.resolve(requestHandler(req, res, next))
         // DOUBT: why promise.resolve is used ?
