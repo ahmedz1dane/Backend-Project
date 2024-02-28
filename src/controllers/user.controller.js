@@ -438,11 +438,196 @@ const refreshAccessToken = asyncHandler(async (req, res) =>{
             "invalid refreshToken ")
     }
 
+
+    
+
 })
+
+const changeCurrentPassword = asyncHandler(
+    async (req, res, ) => {
+        const {oldPassword, newPassword} = req.body
+
+        // DOUBT: We need to find the details of the user
+        //        how we will be able to find that ?
+        // ANS:
+
+        // in order to change the password we know 
+        // that we need to log in . by checking the
+        // user.routes.js we can see that while logging 
+        // in we have used a middleware named verifyJWT
+        // where we are adding the user as an element in
+        // the req object. So we can access the user 
+        // from the req object 
+
+        
+        const user = await User.findById(req.user._id)
+        const isPasswordCorrect = await user.
+        isPasswordCorrect(oldPassword)
+
+        if(!isPasswordCorrect){
+            throw new ApiError(400, "Invalid old password")
+        }
+
+        user.password = newPassword
+        // DOUBT: here in the above we need to change
+        //        the password in the
+        //        database know? , but in the above 
+        //        data in the user is getting chnged why ?
+        // ANS:
+
+        await user.save({validateBeforeSave:false})
+        // DOUBT: Why cant we use User.findByIdAndUpdate()
+        // ANS:
+
+        // When we check the user.model.js there we can see 
+        // that we have written  middleware named `pre` , 
+        // that has 
+        // to check a condition when (u)ser.save() is used
+        // (to encrypt the password before it is saved 
+        // to the database) 
+        // so inorder to run that middleware we are using
+        // save , otherwise we could have used 
+        // (U)ser.findByIdAndUpdate()
+
+        // DOUNT: what is the difference between 
+        // (u)ser.method_name()
+        // and (U)ser.method_name()?
+        // ANS:
+
+        // small user is the user that we have retrieved
+        // we will be using the middleware(methods)
+        //  that we have made by ourselves on it
+        // where as the big User is from the database 
+        // sp we use the methods that are built in on it
+        
+        
+        return res
+        .status(200)
+        .json(
+            new ApiResponse(200,{},"Password changed successfully")
+        )
+
+
+        
+    }
+)
+
+
+const getCurrentUser = asyncHandler(async(req, res) => {
+    return res
+    .status(200)
+    .json(200, req.user, "Current User fetched successfully")
+})
+
+const updateAccountDetails = asyncHandler(
+    async(req, res) =>{
+        const {fullName, email } = req.body
+
+        if(!fullName || !email){
+            throw new ApiError(400, "All fields are required")
+        }
+
+        const user = await User.findByIdAndUpdate(
+            req.user?._id,
+            {
+                $set: {
+                    fullName,
+                    // the above is same as 
+                    // fullName: fullName
+                    email: email
+                }
+            },
+            {new: true}
+            ).select(
+                "-password"
+            )
+
+        return res
+        .status(200)
+        .json(200, user, "Account details updated successfully")
+    })
+
+
+
+const updateUserAvatar = asyncHandler(
+    async (req, res) => {
+        const avatarLocalPath = req.file?.path
+        // when we compare the code in the above with
+        // the code that is there in the register part
+        // we can see that , here the code is less 
+        // because there therre where multiple files
+        // (cover and avatar image), where as here 
+        // there is only one image (avatar) is there.
+
+        if(!avatarLocalPath){
+            throw new ApiError(400, "Avatar file is missing")
+        }
+
+        const avatar = await uploadOnCloudinary(avatarLocalPath)
+
+        if(!avatar.url){
+            throw new ApiError(400, "Error whikle uploading avatar")
+        }
+
+        const user = await User.findByIdAndUpdate(
+            req.user?._id,
+            {
+                $set:{
+                    avatar: avatar.url 
+                }
+            },
+            {new: true}
+        ).select("-password")
+
+        return res
+            .status(200)
+            .json(
+                new ApiResponse(200,user,"Avatar updated successfully")
+                )
+    })
+
+
+    const updateUserCoverImage = asyncHandler(
+        async (req, res) => {
+            const coverImageLocalPath = req.file?.path
+    
+            if(!coverImageLocalPath){
+                throw new ApiError(400, "Cover Image file is missing")
+            }
+    
+            const coverImage = await uploadOnCloudinary(coverImageLocalPath)
+    
+            if(!coverImage.url){
+                throw new ApiError(400, "Error whikle uploading cover image")
+            }
+    
+            const user = await User.findByIdAndUpdate(
+                req.user?._id,
+                {
+                    $set:{
+                        coverImage: coverImage.url 
+                    }
+                },
+                {new: true}
+            ).select("-password")
+
+
+            return res
+            .status(200)
+            .json(
+                new ApiResponse(200,user,"Cover Image updated successfully")
+                )
+        })
 
 export {
     registerUser,
     loginUser,
     logoutUser,
-    refreshAccessToken
+    refreshAccessToken,
+    changeCurrentPassword,
+    getCurrentUser,
+    updateAccountDetails,
+    updateUserAvatar,
+    updateUserCoverImage
+
 } 

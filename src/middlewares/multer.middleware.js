@@ -1,5 +1,13 @@
 import multer from "multer";
 
+
+// DOUBT: why there is the need of diskStorage?
+// ANS: 
+
+// It is one of the storage engines of multer
+// and it helps to define the storage place
+// and the name with which the file has to be stored
+// in that specified place
 const storage = multer.diskStorage({
     destination: function (req, file, cb) {
     // req: is an object that contains http request details
