@@ -3,8 +3,8 @@ import {ApiError} from "../utils/ApiError.js"
 import {User} from '../models/user.model.js'
 import { uploadOnCloudinary } from '../utils/cloudinary.js'
 import { ApiResponse } from '../utils/ApiResposnse.js'
-import { JsonWebTokenError } from 'jsonwebtoken'
 import jwt from 'jsonwebtoken'
+import mongoose from 'mongoose'
 
 
 
@@ -407,7 +407,7 @@ const refreshAccessToken = asyncHandler(async (req, res) =>{
             throw new ApiError(401,"Invalid Refresh Token")
         }
     
-        if(incomingRefreshToken !== user?.refreshTocken){
+        if(incomingRefreshToken !== user?.refreshToken){
             throw new ApiError(401, 
                 "Refresh Token is expired or used")
         }
@@ -516,7 +516,7 @@ const changeCurrentPassword = asyncHandler(
 const getCurrentUser = asyncHandler(async(req, res) => {
     return res
     .status(200)
-    .json(200, req.user, "Current User fetched successfully")
+    .json(new ApiResponse(200, req.user, "Current User fetched successfully"))
 })
 
 const updateAccountDetails = asyncHandler(
@@ -544,7 +544,7 @@ const updateAccountDetails = asyncHandler(
 
         return res
         .status(200)
-        .json(200, user, "Account details updated successfully")
+        .json(new ApiResponse(200, user, "Account details updated successfully"))
     })
 
 
@@ -566,8 +566,10 @@ const updateUserAvatar = asyncHandler(
         const avatar = await uploadOnCloudinary(avatarLocalPath)
 
         if(!avatar.url){
-            throw new ApiError(400, "Error whikle uploading avatar")
+            throw new ApiError(400, "Error while uploading avatar")
         }
+
+        // TODO: Delete old image from the cloudinary
 
         const user = await User.findByIdAndUpdate(
             req.user?._id,
@@ -578,6 +580,8 @@ const updateUserAvatar = asyncHandler(
             },
             {new: true}
         ).select("-password")
+
+
 
         return res
             .status(200)
@@ -619,6 +623,195 @@ const updateUserAvatar = asyncHandler(
                 )
         })
 
+
+const getUserChannelProfile = asyncHandler(
+    // THIS IS THE DASHBOARD OF EACH USER
+    // So there will be the username of each user 
+    // in the url
+    async (req, res) => {
+
+        const {username} = req.params
+        // taking the username from the url
+
+        if(!username?.trim()){
+            throw ApiError(400, "username is missing")
+        }
+
+        const channel = await User.aggregate([
+            {
+                $match: {
+                    username: username?.toLowerCase()
+                }
+            },
+            {
+                $lookup: {
+                    from: "subscriptions",
+                    // in the model we can see that
+                    // its `Subscription`, then why here
+                    // we are using `subscriptions`,  cause 
+                    // we will be using like that only
+                    localField: "_id",
+                    foreignField: "channel",
+                    as: "subscribers"
+                }
+            },
+            {
+                $lookup: {
+                    from: "subscriptions",
+                    localField: "_id",
+                    foreignField: "subscriber",
+                    as: "subscribedTo"
+                }
+            },
+            {
+                $addFields: {
+                    subscribersCount:{
+                        $size: "$subscribers"
+                    },
+                    channelSubscribedToCount: {
+                        $size: "$subscribedTo"
+                    },
+                    isSubscribed: {
+                        $cond: {
+                            if: {$in: [req.user?._id, "$subscribers.subscriber"]},
+                            // DOUBT: What is happening in the above line
+                            // ANS:
+
+                            // I think
+                            // Suppose if we want to find whether a particular
+                            // user is subscribed to a paricular channel.
+                            
+                            // so suppose if the current user has the id 100
+                            // then by using the aggregator we will check 
+                            // the above condition and add that whether the 
+                            // user 100 has subscribed that particular channel 
+                            // or not and add as a field in that collection
+                            // This will get changed, whenever the current user 
+                            // changes
+
+                            // HOW THE CONDITION WORKS:
+
+                            // $in is used to check whether req.user._id is 
+                            // present in the following array or not
+
+                            // we know that if the id of the current user is 
+                            // present in the $subscribers.subscriber of a
+                            // document in the User,  then that particular
+                            // current user is subcriber of that particular
+                            // channel 
+                            then: true,
+                            else: false
+                        }
+                    },
+                    
+                },
+
+            },
+            {
+                $project: {
+                    // DOUBT: What is the purpose of
+                    //        $project?
+                    // ANS:
+
+                    // it defines what all should be
+                    // there in the output of the 
+                    // aggregation
+                    // Suppose if we doesnt add this
+                    // $project, then all the content
+                    // in the existing document + all
+                    // the things we have done in the 
+                    // aggregation will be there in the 
+                    // output
+                    
+                    fullName: 1,
+                    username: 1,
+                    subscribersCount: 1,
+                    channelSubscribedToCount: 1,
+                    isSubscribed: 1,
+                    avatar: 1,
+                    coverImage: 1,
+                    email: 1
+                }
+            }
+        ]) 
+
+        if(!channel?.length){
+            throw new ApiError(404, "Channel doesnt exist")
+        }
+
+        return res
+        .status(200)
+        .json(
+            new ApiResponse(200,channel[0],"User channel fetched successfully")
+        )
+    }
+)
+
+
+const getWatchHistory = asyncHandler(async(req, res) => {
+    const user = await User.aggregate([
+        {
+            $match:{
+                _id: new mongoose.Types.ObjectId(req.user._id)
+            }
+            // DOUBT:why cant we give req._id why there is need to use
+            //      in this way
+
+            // ANS:
+            //  When you see the mongoDB you can see that the id will
+            // be of the form ObjectId(''). But when we use the req._id
+            // we will be only getting the string inside it. But when
+            // we are using the methods from the mongoose , we will 
+            // get yhe whole ObjectId(''), like findById etc.
+            // That is the reason we are uisng like this
+        },
+        {
+            $lookup: {
+                from: "videos",
+                localField: "watchHistory",
+                foreignField: "_id",
+                as: "watchHistory",
+                pipeline: [
+                    {
+                        $lookup: {
+                            from: "users",
+                            localField: "owner",
+                            foreignField: "_id",
+                            as: "owner",
+                            pipeline: [
+                                {
+                                    $project: {
+                                        fullName: 1,
+                                        username: 1,
+                                        avatar: 1
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    {
+                        $addFields:{
+                            owner:{
+                                $first: "$owner"
+                            }
+                        }
+                    }
+                ]
+            }
+        }
+    ])
+
+    return res
+    .status(200)
+    .json(
+        new ApiResponse(
+            200,
+            user[0].watchHistory,
+            "Watch History fetched successfully"
+        )
+    )
+})
+
 export {
     registerUser,
     loginUser,
@@ -628,6 +821,8 @@ export {
     getCurrentUser,
     updateAccountDetails,
     updateUserAvatar,
-    updateUserCoverImage
+    updateUserCoverImage,
+    getUserChannelProfile,
+    getWatchHistory
 
 } 
